@@ -1,0 +1,25 @@
+{
+  "name": "obsidian-xteink-sync",
+  "version": "0.1.0",
+  "description": "Gửi và đồng bộ note Obsidian sang máy đọc sách Xteink (CrossPoint) dưới dạng EPUB",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "tsx --test tests/*.test.ts",
+    "install-vault": "node scripts/install-vault.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "builtin-modules": "^5.4.0",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.13.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2"
+  }
+}

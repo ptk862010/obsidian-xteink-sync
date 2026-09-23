@@ -1,33 +1,54 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { t } from "./i18n";
 import type XteinkSyncPlugin from "./main";
+import type { ShelfState } from "./shelf";
+import { cleanDeviceFolder, cleanLang } from "./validate";
 import type { SyncState } from "./sync";
 
+export { cleanDeviceFolder, cleanLang };
+
+export type Target = "device" | "shelf";
+
 export interface XteinkSettings {
+  target: Target;
   host: string;
   lastIp: string;
   deviceFolder: string;
+  shelfUrl: string;
+  shelfToken: string;
   syncFolders: string[];
   syncTag: string;
   deleteRemoved: boolean;
   mirrorFolders: boolean;
   maxImageWidth: number;
   imageQuality: number;
+  fetchRemoteImages: boolean;
+  autoSend: boolean;
+  autoSendFolder: string;
   lang: string;
   syncState: SyncState;
+  shelfState: ShelfState;
 }
 
 export const DEFAULT_SETTINGS: XteinkSettings = {
+  target: "device",
   host: "crosspoint.local",
   lastIp: "",
   deviceFolder: "Obsidian",
+  shelfUrl: "https://app.xteinklover.workers.dev",
+  shelfToken: "",
   syncFolders: [],
   syncTag: "xteink",
   deleteRemoved: false,
   mirrorFolders: false,
   maxImageWidth: 800,
   imageQuality: 0.8,
-  lang: "vi",
+  fetchRemoteImages: false,
+  autoSend: false,
+  autoSendFolder: "Clippings",
+  lang: "en",
   syncState: {},
+  shelfState: {},
 };
 
 export class XteinkSettingTab extends PluginSettingTab {
@@ -39,57 +60,118 @@ export class XteinkSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = this.plugin.settings;
+    const L = t();
     const save = () => this.plugin.saveSettings();
 
-    new Setting(containerEl).setName("Máy đọc sách").setHeading();
+    new Setting(containerEl).setName(L.hTarget).setHeading();
     new Setting(containerEl)
-      .setName("Địa chỉ máy")
-      .setDesc("Tên mDNS hoặc IP. Máy phải đang ở màn hình File Transfer → Join Network. IP lần cuối tìm thấy: " + (s.lastIp || "chưa có"))
-      .addText((t) => t.setValue(s.host).onChange(async (v) => { s.host = v.trim(); await save(); }));
-    new Setting(containerEl)
-      .setName("Thư mục trên máy")
-      .setDesc("Thư mục trên thẻ SD để chứa EPUB từ Obsidian.")
-      .addText((t) => t.setValue(s.deviceFolder).onChange(async (v) => { s.deviceFolder = v.trim().replace(/^\/+|\/+$/g, "") || "Obsidian"; await save(); }));
-    new Setting(containerEl)
-      .setName("Giữ cây thư mục của vault")
-      .setDesc("Bật: note ở '03 - Resources/Books' lên máy thành /Obsidian/03-Resources/Books/. Tắt: đổ phẳng vào một thư mục. Máy sắp xếp thư mục trước, rồi tên.")
-      .addToggle((t) => t.setValue(s.mirrorFolders).onChange(async (v) => { s.mirrorFolders = v; await save(); }));
-    new Setting(containerEl)
-      .setName("Kiểm tra kết nối")
-      .addButton((b) => b.setButtonText("Thử ngay").onClick(() => this.plugin.checkDevice()));
+      .setName(L.target)
+      .setDesc(L.targetDesc)
+      .addDropdown((d) =>
+        d
+          .addOption("device", L.targetDevice)
+          .addOption("shelf", L.targetShelf)
+          .setValue(s.target)
+          .onChange(async (v) => {
+            s.target = v === "shelf" ? "shelf" : "device";
+            await save();
+            this.display();
+          }),
+      );
 
-    new Setting(containerEl).setName("Đồng bộ bấm-một-cái").setHeading();
+    if (s.target === "shelf") {
+      new Setting(containerEl).setName(L.hShelf).setHeading();
+      new Setting(containerEl)
+        .setName(L.shelfUrl)
+        .setDesc(L.shelfUrlDesc)
+        .addText((x) => x.setValue(s.shelfUrl).onChange(async (v) => { s.shelfUrl = v.trim(); await save(); }));
+      new Setting(containerEl)
+        .setName(L.shelfToken)
+        .setDesc(L.shelfTokenDesc)
+        .addText((x) => {
+          x.inputEl.type = "password";
+          x.setValue(s.shelfToken).onChange(async (v) => { s.shelfToken = v.trim(); await save(); });
+        });
+    } else {
+      new Setting(containerEl).setName(L.hDevice).setHeading();
+      new Setting(containerEl)
+        .setName(L.host)
+        .setDesc(L.hostDesc(s.lastIp))
+        .addText((x) => x.setValue(s.host).onChange(async (v) => { s.host = v.trim(); await save(); }));
+      new Setting(containerEl)
+        .setName(L.deviceFolder)
+        .setDesc(L.deviceFolderDesc)
+        .addText((x) => x.setValue(s.deviceFolder).onChange(async (v) => { s.deviceFolder = cleanDeviceFolder(v); await save(); }));
+      new Setting(containerEl)
+        .setName(L.mirror)
+        .setDesc(L.mirrorDesc)
+        .addToggle((x) => x.setValue(s.mirrorFolders).onChange(async (v) => { s.mirrorFolders = v; await save(); }));
+    }
+    new Setting(containerEl).setName(L.check).addButton((b) => b.setButtonText(L.checkBtn).onClick(() => this.plugin.checkConnection()));
+
+    new Setting(containerEl).setName(L.hAuto).setHeading();
     new Setting(containerEl)
-      .setName("Thư mục cần đồng bộ")
-      .setDesc("Mỗi dòng một thư mục trong vault (vd 03 - Resources/Books & Reading). Để trống nếu chỉ dùng tag.")
-      .addTextArea((t) => {
-        t.setValue(s.syncFolders.join("\n")).onChange(async (v) => {
-          s.syncFolders = v.split("\n").map((x) => x.trim().replace(/^\/+|\/+$/g, "")).filter(Boolean);
+      .setName(L.autoSend)
+      .setDesc(L.autoSendDesc)
+      .addToggle((x) => x.setValue(s.autoSend).onChange(async (v) => { s.autoSend = v; await save(); }));
+    new Setting(containerEl)
+      .setName(L.autoFolder)
+      .setDesc(L.autoFolderDesc)
+      .addText((x) => x.setValue(s.autoSendFolder).onChange(async (v) => { s.autoSendFolder = v.trim().replace(/^\/+|\/+$/g, ""); await save(); }));
+
+    new Setting(containerEl).setName(L.hSync).setHeading();
+    new Setting(containerEl)
+      .setName(L.folders)
+      .setDesc(L.foldersDesc)
+      .addTextArea((x) => {
+        x.setValue(s.syncFolders.join("\n")).onChange(async (v) => {
+          s.syncFolders = v.split("\n").map((f) => f.trim().replace(/^\/+|\/+$/g, "")).filter(Boolean);
           await save();
         });
-        t.inputEl.rows = 4;
-        t.inputEl.cols = 40;
+        x.inputEl.rows = 4;
+        x.inputEl.cols = 40;
       });
     new Setting(containerEl)
-      .setName("Tag cần đồng bộ")
-      .setDesc("Note có tag này (không cần dấu #) cũng được đồng bộ, dù nằm ở đâu.")
-      .addText((t) => t.setValue(s.syncTag).onChange(async (v) => { s.syncTag = v.trim().replace(/^#/, ""); await save(); }));
+      .setName(L.tag)
+      .setDesc(L.tagDesc)
+      .addText((x) => x.setValue(s.syncTag).onChange(async (v) => { s.syncTag = v.trim().replace(/^#/, ""); await save(); }));
     new Setting(containerEl)
-      .setName("Xóa trên máy khi note ra khỏi phạm vi")
-      .setDesc("Tắt thì file cũ cứ nằm lại trên máy. Chỉ xóa file plugin đã gửi.")
-      .addToggle((t) => t.setValue(s.deleteRemoved).onChange(async (v) => { s.deleteRemoved = v; await save(); }));
+      .setName(L.deleteRemoved)
+      .setDesc(L.deleteRemovedDesc)
+      .addToggle((x) => x.setValue(s.deleteRemoved).onChange(async (v) => { s.deleteRemoved = v; await save(); }));
+    const remembered = Object.keys(s.target === "shelf" ? s.shelfState : s.syncState).length;
     new Setting(containerEl)
-      .setName("Quên lịch sử đồng bộ")
-      .setDesc(`Đang nhớ ${Object.keys(s.syncState).length} note. Quên đi thì lần sau gửi lại toàn bộ.`)
-      .addButton((b) => b.setButtonText("Quên").setWarning().onClick(async () => { s.syncState = {}; await save(); this.display(); }));
+      .setName(L.forget)
+      .setDesc(L.forgetDesc(remembered))
+      .addButton((b) =>
+        b.setButtonText(L.forgetBtn).setWarning().onClick(async () => {
+          if (s.target === "shelf") s.shelfState = {};
+          else s.syncState = {};
+          await save();
+          this.display();
+        }),
+      );
 
-    new Setting(containerEl).setName("EPUB").setHeading();
+    new Setting(containerEl).setName(L.hEpub).setHeading();
     new Setting(containerEl)
-      .setName("Chiều rộng ảnh tối đa (px)")
-      .setDesc("Ảnh to hơn sẽ được thu nhỏ cho màn e-ink. X4 rộng 480px.")
-      .addText((t) => t.setValue(String(s.maxImageWidth)).onChange(async (v) => { s.maxImageWidth = Math.max(100, Number(v) || 800); await save(); }));
+      .setName(L.maxWidth)
+      .setDesc(L.maxWidthDesc)
+      .addText((x) => x.setValue(String(s.maxImageWidth)).onChange(async (v) => { s.maxImageWidth = Math.min(2000, Math.max(100, Number(v) || 800)); await save(); }));
     new Setting(containerEl)
-      .setName("Ngôn ngữ EPUB")
-      .addText((t) => t.setValue(s.lang).onChange(async (v) => { s.lang = v.trim() || "vi"; await save(); }));
+      .setName(L.remote)
+      .setDesc(L.remoteDesc)
+      .addToggle((x) => x.setValue(s.fetchRemoteImages).onChange(async (v) => { s.fetchRemoteImages = v; await save(); }));
+    new Setting(containerEl)
+      .setName(L.lang)
+      .setDesc(L.langDesc)
+      .addText((x) =>
+        x.setValue(s.lang).onChange(async (v) => {
+          const ok = cleanLang(v);
+          if (ok) {
+            s.lang = ok;
+            await save();
+          }
+        }),
+      );
   }
 }

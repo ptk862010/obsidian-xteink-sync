@@ -17,7 +17,7 @@ export interface DeviceEntry {
 
 export interface HttpRequest {
   url: string;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "DELETE";
   headers?: Record<string, string>;
   body?: string | ArrayBuffer;
 }
@@ -32,17 +32,28 @@ export type HttpFn = (req: HttpRequest) => Promise<HttpResponse>;
 
 export class DeviceError extends Error {}
 
+/**
+ * Đường dẫn trên máy phải tuyệt đối và không có đoạn "." / ".." (phòng data.json bị sửa tay hoặc hỏng):
+ * plugin không được đụng file ngoài thư mục của nó.
+ */
+export function assertSafeDevicePath(path: string): string {
+  if (!path.startsWith("/") || path.split("/").some((seg) => seg === "." || seg === "..") || /[\\\0\r\n]/.test(path)) {
+    throw new DeviceError(`Unsafe path on the reader: ${path}`);
+  }
+  return path;
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new DeviceError(`${what}: quá ${ms / 1000}s không phản hồi`)), ms);
+    const timer = window.setTimeout(() => reject(new DeviceError(`${what}: quá ${ms / 1000}s không phản hồi`)), ms);
     p.then(
       (v) => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         resolve(v);
       },
       (e) => {
-        clearTimeout(timer);
-        reject(e);
+        window.clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
       },
     );
   });
@@ -68,7 +79,7 @@ export class CrossPointClient {
 
   async listFiles(dir: string): Promise<DeviceEntry[]> {
     const res = await withTimeout(
-      this.http({ url: this.url(`/api/files?path=${encodeURIComponent(dir)}`), method: "GET" }),
+      this.http({ url: this.url(`/api/files?path=${encodeURIComponent(assertSafeDevicePath(dir))}`), method: "GET" }),
       this.timeoutMs,
       "Đọc danh sách file",
     );
@@ -84,7 +95,7 @@ export class CrossPointClient {
         url: this.url("/mkdir"),
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formUrlEncoded({ name, path: parent }),
+        body: formUrlEncoded({ name: assertSafeDevicePath("/" + name).slice(1), path: assertSafeDevicePath(parent) }),
       }),
       this.timeoutMs,
       "Tạo thư mục",
@@ -128,7 +139,7 @@ export class CrossPointClient {
     const { body, contentType } = buildMultipart("file", fileName, bytes, "application/epub+zip");
     const res = await withTimeout(
       this.http({
-        url: this.url(`/upload?path=${encodeURIComponent(dir)}`),
+        url: this.url(`/upload?path=${encodeURIComponent(assertSafeDevicePath(dir))}`),
         method: "POST",
         headers: { "Content-Type": contentType },
         body,
@@ -145,7 +156,7 @@ export class CrossPointClient {
         url: this.url("/delete"),
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formUrlEncoded({ path }),
+        body: formUrlEncoded({ path: assertSafeDevicePath(path) }),
       }),
       this.timeoutMs,
       `Xóa ${path}`,

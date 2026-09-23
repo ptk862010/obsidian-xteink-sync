@@ -41,7 +41,7 @@ export function deviceSubdir(vaultFolder: string): string {
   return vaultFolder
     .split("/")
     .map((seg) => seg.trim())
-    .filter(Boolean)
+    .filter((seg) => seg && !/^\.+$/.test(seg))
     .map((seg) => asciiSlug(seg, 40))
     .join("/");
 }

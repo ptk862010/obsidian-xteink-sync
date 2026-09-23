@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CrossPointClient, findDevice, HttpRequest } from "../src/device";
 
+// Plugin dùng window.setTimeout (Obsidian); Node không có window
+(globalThis as { window?: unknown }).window ??= globalThis;
+
 function fakeHttp(routes: Record<string, (req: HttpRequest) => { status: number; text: string }>) {
   const calls: HttpRequest[] = [];
   const fn = async (req: HttpRequest) => {

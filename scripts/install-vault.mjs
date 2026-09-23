@@ -1,8 +1,12 @@
-// Chép bản build vào vault và bật plugin. Dùng: node scripts/install-vault.mjs [đường dẫn vault]
+// Copy the build into a vault and enable it. Usage: node scripts/install-vault.mjs <path-to-vault>
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const vault = process.argv[2] ?? "D:/Obsidian/Personal";
+const vault = process.argv[2];
+if (!vault) {
+  console.error("Usage: npm run install-vault -- <path-to-vault>");
+  process.exit(1);
+}
 const id = JSON.parse(readFileSync("manifest.json", "utf8")).id;
 const dest = join(vault, ".obsidian", "plugins", id);
 mkdirSync(dest, { recursive: true });

@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { stripInvalidXmlChars } from "./markdown";
 
 export interface EpubImage {
   /** đường dẫn trong EPUB, vd images/img1.jpg */
@@ -27,7 +28,8 @@ export interface EpubInput {
 }
 
 export function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // Bỏ ký tự điều khiển (không hợp lệ trong XML 1.0) rồi escape
+  return stripInvalidXmlChars(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 const STYLE = `body { font-family: serif; line-height: 1.4; margin: 0.5em; }
@@ -59,11 +61,11 @@ function contentOpf(input: EpubInput): string {
     .join("\n");
   const author = input.author ? `    <dc:creator id="creator">${escapeXml(input.author)}</dc:creator>\n` : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="${input.lang}">
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="${escapeXml(input.lang)}">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">${escapeXml(input.identifier)}</dc:identifier>
     <dc:title>${escapeXml(input.title)}</dc:title>
-    <dc:language>${input.lang}</dc:language>
+    <dc:language>${escapeXml(input.lang)}</dc:language>
 ${author}    <dc:date>${input.date}</dc:date>
     <meta property="dcterms:modified">${input.date.replace(/\.\d+Z$/, "Z")}</meta>
   </metadata>
@@ -87,7 +89,7 @@ function navXhtml(input: EpubInput): string {
     : `      <li><a href="text.xhtml">${escapeXml(input.title)}</a></li>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${input.lang}">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${escapeXml(input.lang)}">
 <head><title>${escapeXml(input.title)}</title></head>
 <body>
   <nav epub:type="toc" id="toc">
@@ -128,7 +130,7 @@ ${points}
 export function textXhtml(input: EpubInput): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${input.lang}">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${escapeXml(input.lang)}">
 <head>
   <title>${escapeXml(input.title)}</title>
   <link rel="stylesheet" type="text/css" href="style.css"/>

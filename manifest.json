@@ -2,8 +2,9 @@
   "id": "xteink-sync",
   "name": "Xteink Sync",
   "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "Gửi note hoặc đồng bộ cả thư mục sang máy đọc sách Xteink (CrossPoint) dưới dạng EPUB, qua WiFi.",
-  "author": "Kiên",
-  "isDesktopOnly": false
+  "minAppVersion": "1.8.7",
+  "description": "Send notes, or sync folders and a tag, to an Xteink e-reader running CrossPoint firmware as EPUB, over Wi-Fi or through an Xteink Lover shelf.",
+  "author": "Kien Pham",
+  "isDesktopOnly": false,
+  "authorUrl": "https://github.com/ptk862010"
 }

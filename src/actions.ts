@@ -1,13 +1,15 @@
 import { Notice, TFile, getAllTags } from "obsidian";
+import { t } from "./i18n";
 import type XteinkSyncPlugin from "./main";
 import { noteToEpub } from "./render";
+import { ShelfClient, planShelf } from "./shelf";
 import { NoteInfo, deviceSubdir, epubNameFor, joinRel, planSync } from "./sync";
 import type { CrossPointClient } from "./device";
 
 function titleOf(plugin: XteinkSyncPlugin, f: TFile): string {
-  const t = plugin.app.metadataCache.getFileCache(f)?.frontmatter?.title;
-  if (typeof t !== "string" || !t.trim()) return f.basename;
-  return t.trim().replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_m, a: string, b?: string) => b ?? a);
+  const title: unknown = plugin.app.metadataCache.getFileCache(f)?.frontmatter?.title;
+  if (typeof title !== "string" || !title.trim()) return f.basename;
+  return title.trim().replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_m, a: string, b?: string) => b ?? a);
 }
 
 /** Thư mục con trên máy cho note này ("" nếu đổ phẳng). */
@@ -33,12 +35,15 @@ async function uploadRel(plugin: XteinkSyncPlugin, client: CrossPointClient, rel
   await client.upload(target, name, bytes);
 }
 
-/** Chế độ 1: gửi tay. Máy tắt thì để vào hộp thư, gửi sau. */
+/** Chế độ 1: gửi tay. */
 export async function sendNotes(plugin: XteinkSyncPlugin, files: TFile[]): Promise<void> {
+  if (plugin.settings.target === "shelf") return sendNotesToShelf(plugin, files);
+  const L = t();
   const opts = plugin.renderOptions();
-  const progress = new Notice(`Đang chuyển ${files.length} note…`, 0);
+  const progress = new Notice(L.converting(files.length), 0);
   const made = new Set<string>();
   try {
+    // Máy tắt thì để vào hộp thư, gửi sau
     const client = await plugin.connect();
     let sent = 0;
     let queued = 0;
@@ -54,22 +59,60 @@ export async function sendNotes(plugin: XteinkSyncPlugin, files: TFile[]): Promi
         queued++;
       }
     }
-    if (client) new Notice(`Đã gửi ${sent} note sang Xteink (/${plugin.settings.deviceFolder}).`);
-    else new Notice(`Xteink chưa bật File Transfer → ${queued} note đang chờ trong hộp thư. Bật máy rồi chạy "Gửi hộp thư".`, 8000);
+    if (client) new Notice(L.sentDevice(sent, plugin.settings.deviceFolder));
+    else new Notice(L.queued(queued), 8000);
   } finally {
     progress.hide();
   }
 }
 
+/** Gửi tay lên kệ: gửi lại note đã gửi thì thay bản cũ trên kệ (không để trùng). */
+async function sendNotesToShelf(plugin: XteinkSyncPlugin, files: TFile[]): Promise<void> {
+  const shelf = plugin.shelf();
+  if (!shelf) return;
+  const L = t();
+  const opts = plugin.renderOptions();
+  const state = plugin.settings.shelfState;
+  const progress = new Notice(L.converting(files.length), 0);
+  let sent = 0;
+  try {
+    for (const [i, file] of files.entries()) {
+      progress.setMessage(`(${i + 1}/${files.length}) ${file.basename}`);
+      const { bytes, title, author } = await noteToEpub(plugin.app, file, opts);
+      const id = await shelf.upload(title, author, bytes);
+      const prev = state[file.path];
+      state[file.path] = { id, mtime: file.stat.mtime, size: file.stat.size, manual: prev ? prev.manual : true };
+      await plugin.saveSettings();
+      sent++;
+      if (prev && prev.id !== id) await removeQuietly(shelf, prev.id);
+    }
+    new Notice(L.shelfSent(sent));
+  } finally {
+    progress.hide();
+  }
+}
+
+/** Bản cũ không xóa được (mất mạng…) thì để lại trên kệ, không làm hỏng lượt gửi. */
+async function removeQuietly(shelf: ShelfClient, id: string): Promise<boolean> {
+  try {
+    await shelf.remove(id);
+    return true;
+  } catch (e) {
+    console.warn("[xteink-sync] could not remove old copy", id, e);
+    return false;
+  }
+}
+
 export async function sendOutbox(plugin: XteinkSyncPlugin): Promise<void> {
+  const L = t();
   const pending = await plugin.outbox.list();
   if (!pending.length) {
-    new Notice("Hộp thư trống.");
+    new Notice(L.outboxEmpty);
     return;
   }
   const client = await plugin.connect();
   if (!client) {
-    new Notice(`Xteink chưa bật File Transfer — ${pending.length} file vẫn chờ.`, 6000);
+    new Notice(L.outboxStillWaiting(pending.length), 6000);
     return;
   }
   const progress = new Notice("", 0);
@@ -77,14 +120,14 @@ export async function sendOutbox(plugin: XteinkSyncPlugin): Promise<void> {
   let sent = 0;
   try {
     for (const [i, rel] of pending.entries()) {
-      progress.setMessage(`Hộp thư (${i + 1}/${pending.length}) ${rel}`);
+      progress.setMessage(L.outboxProgress(i + 1, pending.length, rel));
       await uploadRel(plugin, client, rel, await plugin.outbox.read(rel), made);
       await plugin.outbox.remove(rel);
       sent++;
     }
   } finally {
     progress.hide();
-    new Notice(`Đã gửi ${sent}/${pending.length} file từ hộp thư.`);
+    new Notice(L.outboxDone(sent, pending.length));
   }
 }
 
@@ -96,7 +139,7 @@ export function collectScope(plugin: XteinkSyncPlugin): TFile[] {
     if (syncFolders.some((d) => f.path === d || f.path.startsWith(d + "/"))) return true;
     if (!tag) return false;
     const cache = plugin.app.metadataCache.getFileCache(f);
-    return !!cache && (getAllTags(cache) ?? []).some((t) => t.toLowerCase() === tag);
+    return !!cache && (getAllTags(cache) ?? []).some((x) => x.toLowerCase() === tag);
   });
 }
 
@@ -104,12 +147,18 @@ export function collectScope(plugin: XteinkSyncPlugin): TFile[] {
 export async function syncNow(plugin: XteinkSyncPlugin): Promise<void> {
   const files = collectScope(plugin);
   if (!files.length) {
-    new Notice("Chưa có gì để đồng bộ — vào cài đặt chọn thư mục hoặc tag.", 6000);
+    new Notice(t().nothingToSync, 6000);
     return;
   }
+  if (plugin.settings.target === "shelf") return syncShelf(plugin, files);
+  return syncDevice(plugin, files);
+}
+
+async function syncDevice(plugin: XteinkSyncPlugin, files: TFile[]): Promise<void> {
+  const L = t();
   const client = await plugin.connect();
   if (!client) {
-    new Notice("Xteink chưa bật File Transfer → Join Network. Bật rồi bấm lại.", 6000);
+    new Notice(L.deviceNotFound, 6000);
     return;
   }
   await client.ensureDirRecursive(plugin.deviceDir);
@@ -124,7 +173,7 @@ export async function syncNow(plugin: XteinkSyncPlugin): Promise<void> {
   const state = plugin.settings.syncState;
   const plan = planSync(notes, state, onDevice, { deleteRemoved: plugin.settings.deleteRemoved });
   if (!plan.upload.length && !plan.delete.length) {
-    new Notice(`Xteink đã cập nhật — ${plan.unchanged} note không đổi.`);
+    new Notice(L.upToDate(plan.unchanged));
     return;
   }
 
@@ -133,29 +182,84 @@ export async function syncNow(plugin: XteinkSyncPlugin): Promise<void> {
   const made = new Set<string>([plugin.deviceDir]);
   let done = 0;
   let deleted = 0;
+  const failed = new Set<string>();
   try {
     for (const task of plan.upload) {
       const file = plugin.app.vault.getFileByPath(task.note.path);
       if (!file) continue;
-      progress.setMessage(`Đồng bộ (${done + 1}/${plan.upload.length}) ${task.note.title}`);
+      progress.setMessage(L.syncProgress(done + 1, plan.upload.length, task.note.title));
       const { bytes } = await noteToEpub(plugin.app, file, opts);
       await uploadRel(plugin, client, task.epub, bytes, made);
       state[task.note.path] = { epub: task.epub, mtime: task.note.mtime, size: task.note.size };
       await plugin.saveSettings();
       done++;
     }
-    const inScope = new Set(files.map((f) => f.path));
+    // Xóa từng file riêng: một file lỗi không chặn các file khác, và không làm kẹt lịch sử đồng bộ
     for (const rel of plan.delete) {
-      progress.setMessage(`Xóa trên máy: ${rel}`);
-      if (onDevice.has(rel)) await client.delete(`${plugin.deviceDir}/${rel}`);
-      deleted++;
+      progress.setMessage(L.deleting(rel));
+      try {
+        if (onDevice.has(rel)) await client.delete(`${plugin.deviceDir}/${rel}`);
+        deleted++;
+      } catch (e) {
+        console.warn("[xteink-sync] delete failed", rel, e);
+        failed.add(rel);
+      }
     }
     if (plugin.settings.deleteRemoved) {
-      for (const path of Object.keys(state)) if (!inScope.has(path)) delete state[path];
+      const inScope = new Set(files.map((f) => f.path));
+      for (const [path, entry] of Object.entries(state)) if (!inScope.has(path) && !failed.has(entry.epub)) delete state[path];
       await plugin.saveSettings();
     }
   } finally {
     progress.hide();
-    new Notice(`Xteink: gửi ${done}/${plan.upload.length}, xóa ${deleted}, giữ nguyên ${plan.unchanged}.`, 6000);
+    new Notice(L.syncDone(done, plan.upload.length, deleted, plan.unchanged, failed.size), 6000);
+  }
+}
+
+async function syncShelf(plugin: XteinkSyncPlugin, files: TFile[]): Promise<void> {
+  const shelf = plugin.shelf();
+  if (!shelf) return;
+  const L = t();
+  const onShelf = new Set((await shelf.list()).map((b) => b.id));
+  const state = plugin.settings.shelfState;
+  const plan = planShelf(
+    files.map((f) => ({ path: f.path, mtime: f.stat.mtime, size: f.stat.size })),
+    state,
+    onShelf,
+    { deleteRemoved: plugin.settings.deleteRemoved },
+  );
+  if (!plan.upload.length && !plan.remove.length) {
+    new Notice(L.upToDate(plan.unchanged));
+    return;
+  }
+
+  const progress = new Notice("", 0);
+  const opts = plugin.renderOptions();
+  let done = 0;
+  let deleted = 0;
+  let failed = 0;
+  try {
+    for (const task of plan.upload) {
+      const file = plugin.app.vault.getFileByPath(task.path);
+      if (!file) continue;
+      progress.setMessage(L.syncProgress(done + 1, plan.upload.length, file.basename));
+      const { bytes, title, author } = await noteToEpub(plugin.app, file, opts);
+      const id = await shelf.upload(title, author, bytes);
+      state[task.path] = { id, mtime: file.stat.mtime, size: file.stat.size };
+      await plugin.saveSettings();
+      done++;
+      if (task.replace && task.replace !== id && !(await removeQuietly(shelf, task.replace))) failed++;
+    }
+    for (const r of plan.remove) {
+      progress.setMessage(L.deleting(r.path));
+      if (await removeQuietly(shelf, r.id)) {
+        delete state[r.path];
+        deleted++;
+      } else failed++;
+    }
+    await plugin.saveSettings();
+  } finally {
+    progress.hide();
+    new Notice(L.syncDone(done, plan.upload.length, deleted, plan.unchanged, failed), 6000);
   }
 }

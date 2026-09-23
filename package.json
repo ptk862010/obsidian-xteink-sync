@@ -1,6 +1,6 @@
 {
   "name": "obsidian-xteink-sync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send Obsidian notes to an Xteink e-reader (CrossPoint firmware) as EPUB",
   "main": "main.js",
   "private": true,
@@ -17,7 +17,6 @@
     "@eslint/json": "^0.14.0",
     "@types/node": "^26.6.2",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "builtin-modules": "^5.4.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "eslint-plugin-obsidianmd": "^0.4.2",
@@ -27,6 +26,6 @@
     "typescript-eslint": "^8.70.1"
   },
   "dependencies": {
-    "jszip": "^3.10.2"
+    "fflate": "^0.8.3"
   }
 }

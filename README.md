@@ -55,6 +55,8 @@ npm run build                            # main.js
 npm run install-vault -- <path-to-vault> # copy into a vault and enable
 ```
 
+Releasing: bump `version` in `manifest.json` and `package.json`, add it to `versions.json` and a section to `CHANGELOG.md`, commit, then push a tag with the same number (no `v`). GitHub Actions tests, builds, attests and publishes the release.
+
 Reader endpoints: `docs/webserver-endpoints.md` in [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader).
 
 ## License

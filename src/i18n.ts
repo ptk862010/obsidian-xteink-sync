@@ -85,6 +85,7 @@ const en = {
   mermaidLabel: "*Diagram (mermaid):*",
   sourceLabel: "Source",
   sectionN: (n: number) => `Section ${n}`,
+  tocTitle: "Contents",
 };
 
 type Strings = typeof en;
@@ -168,6 +169,7 @@ const vi: Strings = {
   mermaidLabel: "*Sơ đồ (mermaid):*",
   sourceLabel: "Nguồn",
   sectionN: (n) => `Mục ${n}`,
+  tocTitle: "Mục lục",
 };
 
 let current: Strings = en;

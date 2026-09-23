@@ -6,7 +6,7 @@ import { buildMultipart } from "../src/multipart";
 import { asciiSlug } from "../src/slug";
 import { deviceSubdir } from "../src/sync";
 import { cleanDeviceFolder, cleanLang } from "../src/validate";
-import JSZip from "jszip";
+import { strFromU8, unzipSync } from "fflate";
 
 // Plugin dùng window.setTimeout (Obsidian); Node không có window
 (globalThis as { window?: unknown }).window ??= globalThis;
@@ -49,7 +49,6 @@ test("ngôn ngữ EPUB: chỉ nhận mã hợp lệ; escape khi ghi vào XML", a
   assert.equal(cleanLang("<x>"), null);
   assert.equal(escapeXml('a"<b>&' + String.fromCharCode(1)), "a&quot;&lt;b&gt;&amp;");
   const bytes = await buildEpub({ title: "T", lang: 'x"y', bodyXhtml: "<p>a</p>", images: [], headings: [], identifier: "id", date: "2026-09-23T00:00:00.000Z" });
-  const zip = await JSZip.loadAsync(bytes);
-  const opf = await zip.file("OEBPS/content.opf")!.async("string");
+  const opf = strFromU8(unzipSync(bytes)["OEBPS/content.opf"]);
   assert.ok(opf.includes('xml:lang="x&quot;y"'));
 });

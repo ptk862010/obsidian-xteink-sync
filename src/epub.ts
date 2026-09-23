@@ -1,4 +1,5 @@
-import JSZip from "jszip";
+import { Zippable, strToU8, zipSync } from "fflate";
+import { t } from "./i18n";
 import { stripInvalidXmlChars } from "./markdown";
 
 export interface EpubImage {
@@ -93,7 +94,7 @@ function navXhtml(input: EpubInput): string {
 <head><title>${escapeXml(input.title)}</title></head>
 <body>
   <nav epub:type="toc" id="toc">
-    <h1>Mục lục</h1>
+    <h1>${escapeXml(t().tocTitle)}</h1>
     <ol>
 ${items}
     </ol>
@@ -142,16 +143,22 @@ ${input.bodyXhtml}
 `;
 }
 
-/** Đóng gói EPUB 3: mimetype phải là file đầu tiên và không nén. */
+/**
+ * Đóng gói EPUB 3: mimetype phải là file đầu tiên và không nén.
+ * fflate (không dùng JSZip: JSZip kéo theo polyfill tạo thẻ <script>, bị máy quét plugin của Obsidian chặn).
+ */
 export async function buildEpub(input: EpubInput): Promise<Uint8Array> {
-  const zip = new JSZip();
-  zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
-  zip.file("META-INF/container.xml", CONTAINER_XML);
-  zip.file("OEBPS/content.opf", contentOpf(input));
-  zip.file("OEBPS/nav.xhtml", navXhtml(input));
-  zip.file("OEBPS/toc.ncx", tocNcx(input));
-  zip.file("OEBPS/style.css", STYLE);
-  zip.file("OEBPS/text.xhtml", textXhtml(input));
-  for (const img of input.images) zip.file(`OEBPS/${img.href}`, img.bytes);
-  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
+  // Thứ tự khóa = thứ tự trong file zip
+  const files: Zippable = {
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "META-INF/container.xml": strToU8(CONTAINER_XML),
+    "OEBPS/content.opf": strToU8(contentOpf(input)),
+    "OEBPS/nav.xhtml": strToU8(navXhtml(input)),
+    "OEBPS/toc.ncx": strToU8(tocNcx(input)),
+    "OEBPS/style.css": strToU8(STYLE),
+    "OEBPS/text.xhtml": strToU8(textXhtml(input)),
+  };
+  // Ảnh JPEG/PNG đã nén sẵn: nén thêm chỉ tốn CPU
+  for (const img of input.images) files[`OEBPS/${img.href}`] = [img.bytes, { level: 0 }];
+  return Promise.resolve(zipSync(files, { level: 6 }));
 }

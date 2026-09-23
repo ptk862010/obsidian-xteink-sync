@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import JSZip from "jszip";
+import { strFromU8, unzipSync } from "fflate";
 import { buildEpub, escapeXml, EpubInput } from "../src/epub";
 
 const input: EpubInput = {
@@ -22,16 +22,18 @@ test("buildEpub: mimetype đầu tiên, không nén, đủ file bắt buộc", a
   const bytes = await buildEpub(input);
   assert.equal(new TextDecoder().decode(bytes.slice(30, 38)), "mimetype");
   assert.equal(bytes[8] | (bytes[9] << 8), 0, "mimetype phải STORE (method 0)");
-  const zip = await JSZip.loadAsync(bytes);
+  const zip = unzipSync(bytes);
+  assert.equal(Object.keys(zip)[0], "mimetype");
   for (const f of ["META-INF/container.xml", "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/toc.ncx", "OEBPS/text.xhtml", "OEBPS/style.css", "OEBPS/images/img0.jpg"]) {
-    assert.ok(zip.file(f), `thiếu ${f}`);
+    assert.ok(zip[f], `thiếu ${f}`);
   }
-  const opf = await zip.file("OEBPS/content.opf")!.async("string");
+  assert.deepEqual(Array.from(zip["OEBPS/images/img0.jpg"]), [0xff, 0xd8, 0xff]);
+  const opf = strFromU8(zip["OEBPS/content.opf"]);
   assert.ok(opf.includes("<dc:title>Note &quot;thử&quot; &amp; test</dc:title>"));
   assert.ok(opf.includes('href="images/img0.jpg" media-type="image/jpeg"'));
-  const nav = await zip.file("OEBPS/nav.xhtml")!.async("string");
+  const nav = strFromU8(zip["OEBPS/nav.xhtml"]);
   assert.ok(nav.includes('href="text.xhtml#h1">Tiêu đề</a>'));
-  const text = await zip.file("OEBPS/text.xhtml")!.async("string");
+  const text = strFromU8(zip["OEBPS/text.xhtml"]);
   assert.ok(text.includes('xmlns="http://www.w3.org/1999/xhtml"'));
   assert.ok(text.includes("Xin chào <b>đậm</b>"));
 });

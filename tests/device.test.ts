@@ -86,3 +86,35 @@ test("listFilesRecursive và ensureDirRecursive đi qua từng cấp", async () 
   await c.ensureDirRecursive("/Obsidian/Sub/New");
   assert.deepEqual(made, ["name=New&path=%2FObsidian%2FSub"]);
 });
+
+test("OPDS trên máy: đọc danh sách, thêm mới (không index) và sửa (có index), báo lỗi khi đầy", async () => {
+  const saved: unknown[] = [];
+  const { fn, calls } = fakeHttp({
+    "GET /api/opds": () => ({ status: 200, text: JSON.stringify([{ index: 0, name: "Calibre", url: "http://calibre.local/opds", username: "a", hasPassword: true }]) }),
+    "POST /api/opds": (req) => {
+      const b = JSON.parse(String(req.body));
+      saved.push(b);
+      return b.url.includes("full") ? { status: 400, text: "Cannot add server (limit reached)" } : { status: 200, text: "OK" };
+    },
+  });
+  const c = new CrossPointClient(fn, "192.168.1.50");
+  const list = await c.listOpds();
+  assert.equal(list[0].name, "Calibre");
+  await c.saveOpds({ name: "Xteink Lover", url: "https://app.example/opds", username: "kien", password: "abcd-efgh" });
+  await c.saveOpds({ index: 3, name: "Xteink Lover", url: "https://app.example/opds", username: "kien", password: "k2" });
+  assert.deepEqual(saved[0], { name: "Xteink Lover", url: "https://app.example/opds", username: "kien", password: "abcd-efgh" });
+  assert.equal((saved[1] as { index: number }).index, 3);
+  assert.equal(calls[1].headers?.["Content-Type"], "application/json");
+  await assert.rejects(c.saveOpds({ name: "x", url: "https://full/opds", username: "u", password: "p" }), /limit reached/);
+});
+
+test("OPDS trên máy: firmware cũ không có API thì báo rõ", async () => {
+  const { fn } = fakeHttp({});
+  await assert.rejects(new CrossPointClient(fn, "192.168.1.50").listOpds(), /CrossPoint to 1\.6/);
+});
+
+test("so khớp địa chỉ kệ bỏ qua dấu / cuối và hoa thường ở tên miền", async () => {
+  const { sameOpdsUrl } = await import("../src/device");
+  assert.ok(sameOpdsUrl("https://App.Example.dev/opds/", "https://app.example.dev/opds"));
+  assert.ok(!sameOpdsUrl("https://app.example.dev/opds", "https://other.dev/opds"));
+});

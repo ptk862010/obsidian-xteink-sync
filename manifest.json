@@ -1,7 +1,7 @@
 {
   "id": "xteink-sync",
   "name": "Xteink Sync",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minAppVersion": "1.8.7",
   "description": "Send notes, or sync folders and a tag, to an Xteink e-reader running CrossPoint firmware as EPUB, over Wi-Fi or through an Xteink Lover shelf.",
   "author": "Kien Pham",

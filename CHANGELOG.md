@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- New command **Connect reader to Xteink Lover shelf** (also a button in settings): with the reader in File Transfer mode, the plugin creates a new OPDS key and saves the shelf on the reader over Wi-Fi. No more typing the address and key on the e-reader. Needs CrossPoint 1.6 or later.
+- In shelf mode, the reader address setting is shown too (used by Connect reader).
+
 ## 0.1.1
 
 - Replaced the ZIP library (JSZip → fflate). The plugin is now about a third of the size, and it no longer bundles old browser polyfills that created script elements.

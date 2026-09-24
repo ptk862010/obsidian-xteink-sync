@@ -1,6 +1,6 @@
 {
   "name": "obsidian-xteink-sync",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Send Obsidian notes to an Xteink e-reader (CrossPoint firmware) as EPUB",
   "main": "main.js",
   "private": true,

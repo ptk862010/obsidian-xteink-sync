@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { t } from "./i18n";
+import { connectReader } from "./actions";
 import type XteinkSyncPlugin from "./main";
 import type { ShelfState } from "./shelf";
 import { cleanDeviceFolder, cleanLang } from "./validate";
@@ -92,6 +93,14 @@ export class XteinkSettingTab extends PluginSettingTab {
           x.inputEl.type = "password";
           x.setValue(s.shelfToken).onChange(async (v) => { s.shelfToken = v.trim(); await save(); });
         });
+      new Setting(containerEl)
+        .setName(L.host)
+        .setDesc(L.hostDesc(s.lastIp))
+        .addText((x) => x.setValue(s.host).onChange(async (v) => { s.host = v.trim(); await save(); }));
+      new Setting(containerEl)
+        .setName(L.connectBtn)
+        .setDesc(L.connectDesc)
+        .addButton((b) => b.setButtonText(L.connectBtn).onClick(() => this.plugin.run(() => connectReader(this.plugin))));
     } else {
       new Setting(containerEl).setName(L.hDevice).setHeading();
       new Setting(containerEl)

@@ -1,10 +1,11 @@
 import { Notice, TFile, getAllTags } from "obsidian";
+import { confirmDialog } from "./confirm";
 import { t } from "./i18n";
 import type XteinkSyncPlugin from "./main";
 import { noteToEpub } from "./render";
 import { ShelfClient, planShelf } from "./shelf";
 import { NoteInfo, deviceSubdir, epubNameFor, joinRel, planSync } from "./sync";
-import type { CrossPointClient } from "./device";
+import { type CrossPointClient, sameOpdsUrl } from "./device";
 
 function titleOf(plugin: XteinkSyncPlugin, f: TFile): string {
   const title: unknown = plugin.app.metadataCache.getFileCache(f)?.frontmatter?.title;
@@ -263,3 +264,33 @@ async function syncShelf(plugin: XteinkSyncPlugin, files: TFile[]): Promise<void
     new Notice(L.syncDone(done, plan.upload.length, deleted, plan.unchanged, failed), 6000);
   }
 }
+
+/**
+ * Nối máy đọc với kệ Xteink Lover qua WiFi: tạo khóa OPDS mới rồi ghi server "Xteink Lover" vào máy
+ * (CrossPoint 1.6+ có POST /api/opds), người dùng khỏi phải gõ địa chỉ và khóa trên máy.
+ * Kiểm máy và đọc danh sách server TRƯỚC khi tạo khóa, để máy không tới được thì khóa cũ vẫn còn dùng được.
+ */
+export async function connectReader(plugin: XteinkSyncPlugin): Promise<void> {
+  const L = t();
+  const shelf = plugin.shelf();
+  if (!shelf) return;
+  const client = await plugin.connect();
+  if (!client) {
+    new Notice(L.deviceNotFound, 8000);
+    return;
+  }
+  const servers = await client.listOpds();
+  const existing = servers.find((s) => sameOpdsUrl(s.url, shelf.opdsUrl));
+  if (!(await confirmDialog(plugin.app, L.connectTitle, L.connectBody(client.host, !!existing), L.connectGo, L.cancel))) return;
+
+  const { key, username } = await shelf.newOpdsKey();
+  try {
+    await client.saveOpds({ index: existing?.index, name: "Xteink Lover", url: shelf.opdsUrl, username, password: key });
+  } catch (e) {
+    // Khóa mới đã có hiệu lực: báo cho người dùng để gõ tay nếu máy không nhận
+    new Notice(L.connectSaveFailed(key, (e as Error).message), 0);
+    return;
+  }
+  new Notice(L.connectDone(username), 8000);
+}
+

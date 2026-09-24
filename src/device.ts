@@ -15,6 +15,15 @@ export interface DeviceEntry {
   isEpub: boolean;
 }
 
+/** Server OPDS đã lưu trên máy (GET /api/opds; mật khẩu không bao giờ được trả về). */
+export interface DeviceOpdsServer {
+  index: number;
+  name: string;
+  url: string;
+  username: string;
+  hasPassword: boolean;
+}
+
 export interface HttpRequest {
   url: string;
   method: "GET" | "POST" | "DELETE";
@@ -150,6 +159,27 @@ export class CrossPointClient {
     if (res.status !== 200) throw new DeviceError(`Gửi ${fileName} lỗi ${res.status}: ${res.text.slice(0, 120)}`);
   }
 
+  /** Danh sách server OPDS trên máy (CrossPoint 1.6+). */
+  async listOpds(): Promise<DeviceOpdsServer[]> {
+    const res = await withTimeout(this.http({ url: this.url("/api/opds"), method: "GET" }), this.timeoutMs, "OPDS");
+    if (res.status === 404) throw new DeviceError("This firmware has no OPDS settings API (update CrossPoint to 1.6 or later)");
+    if (res.status !== 200) throw new DeviceError(`/api/opds: ${res.status}`);
+    const list = JSON.parse(res.text) as DeviceOpdsServer[];
+    return Array.isArray(list) ? list : [];
+  }
+
+  /** Thêm hoặc sửa một server OPDS trên máy (tối đa 8 server). */
+  async saveOpds(entry: OpdsServerInput): Promise<void> {
+    const body: Record<string, unknown> = { name: entry.name, url: entry.url, username: entry.username, password: entry.password };
+    if (entry.index !== undefined) body.index = entry.index;
+    const res = await withTimeout(
+      this.http({ url: this.url("/api/opds"), method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+      this.timeoutMs,
+      "OPDS",
+    );
+    if (res.status !== 200) throw new DeviceError(res.text.trim().slice(0, 120) || `/api/opds: ${res.status}`);
+  }
+
   async delete(path: string): Promise<void> {
     const res = await withTimeout(
       this.http({
@@ -163,6 +193,28 @@ export class CrossPointClient {
     );
     if (res.status !== 200) throw new DeviceError(`Xóa ${path} lỗi ${res.status}: ${res.text.slice(0, 120)}`);
   }
+}
+
+export interface OpdsServerInput {
+  /** có index = sửa mục đó; không có = thêm mới */
+  index?: number;
+  name: string;
+  url: string;
+  username: string;
+  password: string;
+}
+
+/** So khớp địa chỉ kệ: bỏ dấu / cuối, không phân biệt hoa thường ở phần tên miền. */
+export function sameOpdsUrl(a: string, b: string): boolean {
+  const norm = (u: string) => {
+    try {
+      const x = new URL(u.trim());
+      return `${x.protocol}//${x.host.toLowerCase()}${x.pathname.replace(/\/+$/, "")}`;
+    } catch {
+      return u.trim().replace(/\/+$/, "");
+    }
+  };
+  return norm(a) === norm(b);
 }
 
 /** Thử lần lượt các địa chỉ (crosspoint.local, IP nhớ lần trước...) — máy chỉ trả lời khi đang ở File Transfer. */

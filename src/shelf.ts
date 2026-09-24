@@ -104,6 +104,20 @@ export class ShelfClient {
     return id;
   }
 
+  /** Địa chỉ feed OPDS của kệ (điền vào máy đọc). */
+  get opdsUrl(): string {
+    return `${this.base}/opds`;
+  }
+
+  /** Tạo khóa OPDS mới cho máy đọc. Khóa cũ (trên máy khác, nếu có) hết dùng được ngay. */
+  async newOpdsKey(): Promise<{ key: string; username: string }> {
+    const res = await this.http({ url: `${this.base}/api/opds-key`, method: "POST", headers: this.headers() });
+    if (res.status !== 200) throw ShelfClient.fail(res.status, res.text);
+    const d = ShelfClient.parse<{ opdsKey?: string; username?: string }>(res.text);
+    if (!d?.opdsKey || !d.username) throw new ShelfError("Unexpected response", res.status);
+    return { key: d.opdsKey, username: d.username };
+  }
+
   /** Xóa sách; sách đã không còn (xóa trên web) thì coi như xong. */
   async remove(id: string): Promise<void> {
     if (!/^[a-z0-9]{9,24}$/.test(id)) return;

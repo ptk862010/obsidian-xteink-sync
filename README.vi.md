@@ -35,7 +35,9 @@ Dùng chính bộ hiển thị Markdown của Obsidian nên callout, bảng, nh�
 3. Trong Obsidian: *Gửi tới* → *Kệ Xteink Lover*, dán mã, bấm *Thử ngay*.
 4. Trên máy: thêm máy chủ OPDS theo hướng dẫn ở **⚡ Nối máy** trên web.
 
-Mã chỉ xem, gửi, xóa được sách trên kệ; không đổi được mật khẩu hay tài khoản, thu hồi trên web bất cứ lúc nào.
+5. Tùy chọn, thay cho bước 4: bật máy ở **File Transfer → Join Network** rồi chạy **Nối máy đọc với kệ Xteink Lover** (hoặc nút *Nối máy đọc* trong cài đặt). Plugin tạo khóa OPDS mới và ghi server "Xteink Lover" vào máy qua WiFi (CrossPoint 1.6 trở lên), không phải gõ gì trên máy. Máy khác còn dùng khóa cũ thì phải cập nhật khóa mới.
+
+Mã xem, gửi, xóa được sách trên kệ và tạo được khóa OPDS mới cho lệnh **Nối máy đọc**; không đổi được mật khẩu hay tài khoản, thu hồi trên web bất cứ lúc nào.
 
 ## Kết nối mạng
 

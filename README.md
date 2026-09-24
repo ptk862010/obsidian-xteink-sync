@@ -33,13 +33,16 @@ Notes are rendered with Obsidian's own Markdown renderer, so callouts, tables, e
 3. In Obsidian: *Send to* → *Xteink Lover shelf*, paste the token, press *Check*.
 4. On the reader: add the OPDS server shown under **⚡ Connect** on the website.
 
-The token can only list, add and remove books on your shelf. It cannot change your password or account, and you can revoke it on the website at any time.
+5. Optional, instead of step 4: put the reader in **File Transfer → Join Network** and run **Connect reader to Xteink Lover shelf** (or the *Connect reader* button in settings). The plugin creates a new OPDS key and saves the "Xteink Lover" server on the reader over Wi-Fi (CrossPoint 1.6+), so you don't type anything on the reader. Readers still using the old key need the new one.
+
+The token can list, add and remove books on your shelf, and create a new OPDS key for **Connect reader**. It cannot change your password or account, and you can revoke it on the website at any time.
 
 ## Network use
 
 This plugin makes network requests only when you send or sync, or press *Check*:
 
 - **Reader on Wi-Fi**: plain HTTP to the reader on your local network (`crosspoint.local` or the IP you set): `/api/status`, `/api/files`, `/upload`, `/mkdir`, `/delete`. CrossPoint has no login and no encryption, so only use this on a network you trust. `/delete` is only called for files this plugin sent, when *Remove when a note leaves the sync scope* is on.
+- **Connect reader**: plain HTTP to the reader on your local network, `GET`/`POST /api/opds`, to save the shelf address, your username and the new OPDS key on the reader.
 - **Xteink Lover shelf**: HTTPS to the server you set (default `https://app.xteinklover.workers.dev`), with your app token: list, upload and remove books. The EPUBs (your note content) are stored on that server. The hosted service runs on Cloudflare; you can self-host it instead ([source](https://github.com/ptk862010/xteinklover)).
 - **Images from the web**: off by default. If you turn on *Download images from the web*, images that notes link with `https://` addresses are downloaded while converting (up to 10 MB each). Otherwise they are replaced by their alt text and nothing is fetched.
 

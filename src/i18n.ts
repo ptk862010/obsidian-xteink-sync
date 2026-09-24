@@ -8,6 +8,7 @@ const en = {
   cmdSendOutbox: "Send queued files",
   cmdSync: "Sync folders and tag",
   cmdCheck: "Check connection",
+  cmdConnectReader: "Connect reader to Xteink Lover shelf",
   ribbonSync: "Sync to Xteink",
   menuSendOne: "Send to Xteink",
   menuSendMany: (n: number) => `Send ${n} notes to Xteink`,
@@ -34,6 +35,15 @@ const en = {
   shelfNoToken: "Paste an app token from your Xteink Lover account in settings first.",
   shelfSent: (n: number) => `Sent ${n} notes to your Xteink Lover shelf. The reader picks them up from OPDS.`,
   shelfReady: (user: string, books: number, max: number) => `Connected to Xteink Lover as ${user} (${books}/${max} books).`,
+  connectTitle: "Connect your reader to the shelf?",
+  connectBody: (host: string, existing: boolean) =>
+    `This creates a new OPDS key for your Xteink Lover account and ${existing ? "updates the \"Xteink Lover\" server" : "adds an \"Xteink Lover\" server"} on the reader at ${host}. Any other reader still using the old key will stop working until you update it.`,
+  connectGo: "Connect",
+  cancel: "Cancel",
+  connectDone: (user: string) => `Reader connected to ${user}'s shelf. On the reader: Settings → OPDS → Xteink Lover.`,
+  connectSaveFailed: (key: string, err: string) => `The reader didn't save the server (${err}). Your new OPDS key is ${key}: type it on the reader, or try again.`,
+  connectBtn: "Connect reader",
+  connectDesc: "Puts this shelf on your Xteink over Wi-Fi, so you don't have to type the address and key on the reader. The reader must be in File Transfer → Join Network.",
 
   // settings
   hTarget: "Destination",
@@ -95,6 +105,7 @@ const vi: Strings = {
   cmdSendOutbox: "Gửi hộp thư đang chờ",
   cmdSync: "Đồng bộ thư mục và tag",
   cmdCheck: "Kiểm tra kết nối",
+  cmdConnectReader: "Nối máy đọc với kệ Xteink Lover",
   ribbonSync: "Đồng bộ sang Xteink",
   menuSendOne: "Gửi sang Xteink",
   menuSendMany: (n) => `Gửi ${n} note sang Xteink`,
@@ -120,6 +131,15 @@ const vi: Strings = {
   shelfNoToken: "Dán mã ứng dụng của tài khoản Xteink Lover vào cài đặt trước đã.",
   shelfSent: (n) => `Đã gửi ${n} note lên kệ Xteink Lover. Máy đọc mở kệ OPDS là thấy.`,
   shelfReady: (user, books, max) => `Đã nối Xteink Lover, tài khoản ${user} (${books}/${max} cuốn).`,
+  connectTitle: "Nối máy đọc với kệ?",
+  connectBody: (host, existing) =>
+    `Plugin sẽ tạo khóa OPDS mới cho tài khoản Xteink Lover và ${existing ? "cập nhật server \"Xteink Lover\"" : "thêm server \"Xteink Lover\""} trên máy ở ${host}. Máy khác còn dùng khóa cũ sẽ hết kéo sách được cho tới khi cập nhật.`,
+  connectGo: "Nối máy",
+  cancel: "Hủy",
+  connectDone: (user) => `Đã nối máy với kệ của ${user}. Trên máy: Settings → OPDS → Xteink Lover.`,
+  connectSaveFailed: (key, err) => `Máy chưa lưu được server (${err}). Khóa OPDS mới là ${key}: gõ tay trên máy, hoặc thử lại.`,
+  connectBtn: "Nối máy đọc",
+  connectDesc: "Ghi kệ này vào máy Xteink qua WiFi, khỏi phải gõ địa chỉ và khóa trên máy. Máy phải đang ở File Transfer → Join Network.",
 
   hTarget: "Gửi tới đâu",
   target: "Gửi tới",

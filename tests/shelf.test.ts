@@ -83,3 +83,13 @@ test("planShelf: mới, sửa (thay bản cũ), bị xóa trên web, không đ�
   assert.equal(plan.unchanged, 1);
   assert.deepEqual(planShelf(notes, state, onShelf, { deleteRemoved: false }).remove, []);
 });
+
+test("newOpdsKey: POST /api/opds-key bằng Bearer, trả khóa và tên; opdsUrl đúng", async () => {
+  const { http, calls } = fakeHttp(() => ({ status: 200, body: { opdsKey: "abcd-efgh-jkmn-pqrs", username: "kien" } }));
+  const shelf = new ShelfClient(http, "app.example.dev", TOKEN);
+  assert.deepEqual(await shelf.newOpdsKey(), { key: "abcd-efgh-jkmn-pqrs", username: "kien" });
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].url, "https://app.example.dev/api/opds-key");
+  assert.equal(calls[0].headers?.Authorization, "Bearer " + TOKEN);
+  assert.equal(shelf.opdsUrl, "https://app.example.dev/opds");
+});

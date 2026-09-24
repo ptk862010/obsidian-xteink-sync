@@ -2,7 +2,7 @@ import { Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, getLanguage, reque
 import { CrossPointClient, HttpFn, findDevice } from "./device";
 import { DEFAULT_SETTINGS, XteinkSettingTab, XteinkSettings, cleanDeviceFolder, cleanLang } from "./settings";
 import { Outbox } from "./outbox";
-import { sendNotes, sendOutbox, syncNow } from "./actions";
+import { connectReader, sendNotes, sendOutbox, syncNow } from "./actions";
 import { setLanguage, t } from "./i18n";
 import { ShelfClient } from "./shelf";
 
@@ -42,6 +42,7 @@ export default class XteinkSyncPlugin extends Plugin {
     this.addCommand({ id: "send-outbox", name: L.cmdSendOutbox, callback: () => this.run(() => sendOutbox(this)) });
     this.addCommand({ id: "sync", name: L.cmdSync, callback: () => this.run(() => syncNow(this)) });
     this.addCommand({ id: "check-device", name: L.cmdCheck, callback: () => this.checkConnection() });
+    this.addCommand({ id: "connect-reader", name: L.cmdConnectReader, callback: () => this.run(() => connectReader(this)) });
 
     // Chỉ theo dõi sau khi vault nạp xong: lúc khởi động Obsidian bắn "create" cho mọi file sẵn có
     this.app.workspace.onLayoutReady(() => {
@@ -188,7 +189,7 @@ export default class XteinkSyncPlugin extends Plugin {
   }
 
   /** Mỗi lúc chỉ chạy một việc, lỗi thì báo Notice thay vì im lặng. */
-  private async run(work: () => Promise<void>): Promise<void> {
+  async run(work: () => Promise<void>): Promise<void> {
     if (this.busy) {
       new Notice(t().busy);
       return;
